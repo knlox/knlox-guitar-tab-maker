@@ -76,6 +76,7 @@ function App() {
   const [fullscreenEditing, setFullscreenEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [form, setForm] = useState({ title: '', artist: '', tuning: '', tabContent: '' });
   const [tuningPreset, setTuningPreset] = useState('Standard (E A D G B e)');
@@ -124,6 +125,13 @@ function App() {
       .then(res => setTabs(res.data || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  const inviteToTab = (tabId, email) => {
+    // TODO: Implement invite functionality
+    console.log('Inviting', email, 'to tab', tabId);
+    // This is a placeholder function to prevent ESLint errors
+    // Implementation would involve sending an invitation to collaborate on a tab
   };
 
   const mockSignInWithGoogle = () => {
