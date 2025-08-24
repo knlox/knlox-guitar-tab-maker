@@ -177,6 +177,7 @@
   outline: none;
 }
 .modal select { padding: 8px 10px; border-radius: 8px; border: 1px solid #e6edf3; font-size: 14px; }
+.modal select { padding: 8px 10px; border-radius: 8px; border: 1px solid #e6edf3; font-size: 14px; }
 .modal textarea { font-family: inherit; }
 
 .btn { background: transparent; border: 1px solid rgba(15,23,42,0.06); padding: 8px 10px; border-radius: 8px; color: var(--text); }

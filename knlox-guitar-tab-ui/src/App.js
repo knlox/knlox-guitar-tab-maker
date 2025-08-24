@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getTabs, createTab, updateTab, deleteTab, getTabById } from './services/tabService';
+import { getUserByEmail, createOrUpdateUser, deleteUser, register, login } from './services/userService';
 import logo from './logo.svg';
 import './App.css';
 
@@ -8,6 +9,13 @@ function App() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState('light');
+  const [user, setUser] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
+  const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTab, setEditTab] = useState(null);
   const TUNING_PRESETS = {
@@ -69,6 +77,19 @@ function App() {
     } catch (e) { /* ignore */ }
   }, []);
 
+  // load profile from localStorage (mock signed in state)
+  useEffect(() => {
+    try {
+      const profile = localStorage.getItem('profile');
+      if (profile) setUser(JSON.parse(profile));
+    } catch (e) {}
+  }, []);
+
+  // if no user, force auth modal on load
+  useEffect(() => {
+    if (!user) setAuthOpen(true);
+  }, [user]);
+
   // apply theme to document root
   useEffect(() => {
     try {
@@ -83,6 +104,106 @@ function App() {
       .then(res => setTabs(res.data || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  const mockSignInWithGoogle = () => {
+    // in real app you'd do OAuth; here we'll prompt for email and create profile
+    const email = window.prompt('Enter your Google email to sign in (mock)');
+    if (!email) return;
+    setAuthLoading(true); setAuthError(null);
+    const profile = { email, name: email.split('@')[0], theme };
+    createOrUpdateUser(profile)
+      .then(res => {
+        setUser(res.data);
+        localStorage.setItem('profile', JSON.stringify(res.data));
+        if (res.data.theme) setTheme(res.data.theme);
+        setAuthOpen(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setAuthError(err.response?.data || err.message || 'Sign in failed');
+        alert('Sign in failed: ' + (err.response?.data || err.message));
+      })
+      .finally(() => setAuthLoading(false));
+  };
+
+  const handleRegister = () => {
+    if (!authForm.email || !authForm.password) return alert('email and password required');
+    setAuthLoading(true); setAuthError(null);
+    const payload = { email: authForm.email, password: authForm.password, name: authForm.name, theme };
+    console.log('register payload', payload);
+    register(payload)
+      .then(res => {
+        console.log('register success', res.data);
+        setUser(res.data);
+        localStorage.setItem('profile', JSON.stringify(res.data));
+        setAuthOpen(false);
+      })
+      .catch(err => {
+        console.error('register failed, falling back to createOrUpdateUser', err);
+        setAuthError('Register endpoint failed, attempting direct user create');
+        // fallback: create via /api/users (no password stored in this flow)
+        createOrUpdateUser(payload)
+          .then(r2 => {
+            setUser(r2.data);
+            localStorage.setItem('profile', JSON.stringify(r2.data));
+            setAuthOpen(false);
+          })
+          .catch(err2 => {
+            console.error('fallback create failed', err2);
+            const msg = err2.response?.data || err2.message || 'Registration failed';
+            setAuthError(msg);
+            alert('Registration failed: ' + msg);
+          })
+          .finally(() => setAuthLoading(false));
+      })
+      .finally(() => setAuthLoading(false));
+  };
+
+  const handleLogin = () => {
+    if (!authForm.email || !authForm.password) return alert('email and password required');
+    setAuthLoading(true); setAuthError(null);
+    login({ email: authForm.email, password: authForm.password })
+      .then(res => {
+        if (!res.data) {
+          setAuthError('Invalid credentials');
+          alert('Invalid credentials');
+          return;
+        }
+        setUser(res.data);
+        localStorage.setItem('profile', JSON.stringify(res.data));
+        if (res.data.theme) setTheme(res.data.theme);
+        setAuthOpen(false);
+      })
+      .catch(err => {
+        console.error(err);
+        const msg = err.response?.data || err.message || 'Login failed';
+        setAuthError(msg);
+        alert('Login failed: ' + msg);
+      })
+      .finally(() => setAuthLoading(false));
+  };
+
+  const openSettings = () => setSettingsOpen(true);
+
+  const saveSettings = () => {
+    if (!user) return;
+    const updated = { ...user, theme };
+    createOrUpdateUser(updated).then(res => {
+      setUser(res.data);
+      localStorage.setItem('profile', JSON.stringify(res.data));
+      setSettingsOpen(false);
+    }).catch(err => console.error(err));
+  };
+
+  const handleDeleteAccount = () => {
+    if (!user) return;
+    if (!window.confirm('Delete your account? This cannot be undone.')) return;
+    deleteUser(user.id).then(() => {
+      setUser(null);
+      localStorage.removeItem('profile');
+      setSettingsOpen(false);
+    }).catch(err => console.error(err));
   };
 
   const openNew = () => {
@@ -188,6 +309,14 @@ function App() {
           />
           <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? '🌙' : '☀️'}</button>
           <button className="btn primary" onClick={openNew}>New Tab</button>
+          {user ? (
+            <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+              <div className="tab-meta">{user.name}</div>
+              <button className="btn" onClick={openSettings}>Settings</button>
+            </div>
+          ) : (
+            <button className="btn" onClick={mockSignInWithGoogle}>Sign in with Google</button>
+          )}
         </div>
       </header>
 
@@ -262,6 +391,48 @@ function App() {
               <button className="btn primary" onClick={handleFullscreenSave}>Save</button>
               <button className="btn" onClick={() => setFullscreenOpen(false)}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+      {settingsOpen && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>Settings</h3>
+            <label>Theme</label>
+            <select value={theme} onChange={e => setTheme(e.target.value)}>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            <div style={{display:'flex', gap:8, marginTop:12}}>
+              <button className="btn primary" onClick={saveSettings}>Save</button>
+              <button className="btn" onClick={() => setSettingsOpen(false)}>Cancel</button>
+              <button className="btn" onClick={handleDeleteAccount} style={{marginLeft:'auto', color:'#cc3333'}}>Delete Account</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {authOpen && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>{isRegister ? 'Register' : 'Login'}</h3>
+            <label>Email</label>
+            <input value={authForm.email} onChange={e => setAuthForm({...authForm, email: e.target.value})} />
+            <label>{isRegister ? 'Name' : 'Password'}</label>
+            {isRegister ? (
+              <input value={authForm.name} onChange={e => setAuthForm({...authForm, name: e.target.value})} />
+            ) : null}
+            <label>Password</label>
+            <input type="password" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+            <div style={{display:'flex', gap:8, marginTop:12}}>
+              {isRegister ? (
+                <button className="btn primary" onClick={handleRegister} disabled={authLoading}>{authLoading ? 'Registering…' : 'Register'}</button>
+              ) : (
+                <button className="btn primary" onClick={handleLogin} disabled={authLoading}>{authLoading ? 'Logging in…' : 'Login'}</button>
+              )}
+              <button className="btn" onClick={() => setIsRegister(!isRegister)} disabled={authLoading}>{isRegister ? 'Have an account? Login' : 'Create account'}</button>
+              <button className="btn" onClick={mockSignInWithGoogle} disabled={authLoading}>{authLoading ? 'Working…' : 'Sign in with Google'}</button>
+            </div>
+            {authError ? <p style={{color: 'crimson'}}>{String(authError)}</p> : null}
           </div>
         </div>
       )}
