@@ -13,9 +13,24 @@
   --accent: #2563eb;
   --accent-2: #06b6d4;
   --text: #0f172a;
+  --pre-bg: #ffffff;
+  --pre-color: #0f172a;
   --glass: rgba(255,255,255,0.6);
   --radius: 10px;
   --shadow: 0 6px 18px rgba(15,23,42,0.08);
+}
+
+:root[data-theme='dark'] {
+  --bg: #0b1220;
+  --card: #0f172a;
+  --muted: #94a3b8;
+  --accent: #7dd3fc;
+  --accent-2: #60a5fa;
+  --text: #e6eef8;
+  --pre-bg: #021124;
+  --pre-color: #b7f5d8;
+  --glass: rgba(255,255,255,0.04);
+  --shadow: 0 8px 30px rgba(2,6,23,0.6);
 }
 
 .App-header {
@@ -58,6 +73,8 @@
   gap: 8px;
   align-items: center;
 }
+
+.btn[aria-pressed='true'], .btn.toggle { padding: 8px; }
 
 .search {
   padding: 8px 12px;
@@ -116,8 +133,8 @@
 .tab-meta { color: var(--muted); font-size: 13px; }
 
 .tab-pre {
-  background: #0b1220;
-  color: #d1fae5;
+  background: var(--pre-bg);
+  color: var(--pre-color);
   padding: 12px;
   border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
@@ -148,6 +165,9 @@
   flex-direction: column;
   gap: 8px;
 }
+.modal textarea { width: 100%; resize: vertical; background: var(--pre-bg); color: var(--pre-color); border: 1px solid rgba(15,23,42,0.06); }
+
+:root[data-theme='dark'] .modal textarea { border-color: rgba(255,255,255,0.06); }
 .modal label { font-size: 13px; color: var(--muted); }
 .modal input, .modal textarea {
   padding: 8px 10px;
@@ -156,10 +176,14 @@
   font-size: 14px;
   outline: none;
 }
+.modal select { padding: 8px 10px; border-radius: 8px; border: 1px solid #e6edf3; font-size: 14px; }
 .modal textarea { font-family: inherit; }
 
-.btn { background: transparent; border: 1px solid rgba(15,23,42,0.06); padding: 8px 10px; border-radius: 8px; }
-.btn.primary { background: var(--accent); color: white; border: none; }
+.btn { background: transparent; border: 1px solid rgba(15,23,42,0.06); padding: 8px 10px; border-radius: 8px; color: var(--text); }
+.btn.primary { background: var(--accent); color: var(--card); border: none; }
+
+:root[data-theme='dark'] .btn { border-color: rgba(255,255,255,0.06); }
+:root[data-theme='dark'] .btn.primary { background: var(--accent-2); color: #021124; }
 
 
 @media (max-width: 600px) {
