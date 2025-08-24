@@ -1,23 +1,30 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useEffect, useState } from 'react';
+import { getTabs } from './services/tabService';
 
 function App() {
+  const [tabs, setTabs] = useState([]);
+
+  useEffect(() => {
+    getTabs()
+      .then(res => setTabs(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <h1>Guitar Tabs</h1>
+      {tabs.length === 0 ? (
+        <p>No tabs found.</p>
+      ) : (
+        <ul>
+          {tabs.map(tab => (
+            <li key={tab.id}>
+              <h2>{tab.title} - {tab.artist}</h2>
+              <pre>{tab.tabContent}</pre>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
