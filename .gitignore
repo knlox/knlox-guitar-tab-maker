@@ -23,3 +23,9 @@ yarn-error.log*
 # Ignore system files
 .DS_Store
 Thumbs.db
+
+# Node/React
+knlox-guitar-tab-ui/node_modules/
+knlox-guitar-tab-ui/build/
+
+
