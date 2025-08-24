@@ -1,31 +1,29 @@
-# Ignore Node.js dependencies
+# Node/React dependencies
 node_modules/
 
-# Ignore build outputs
+# Build outputs
 dist/
 build/
 target/
 
-# Ignore logs
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Ignore environment files
+# Environment files
 .env
 .env.local
 
-# Ignore IDE/editor configs
+# IDE/editor configs
 .vscode/
 .idea/
 
-# Ignore system files
+# System files
 .DS_Store
 Thumbs.db
 
-# Node/React
+# Project-specific paths (optional, if you want explicit)
 knlox-guitar-tab-ui/node_modules/
 knlox-guitar-tab-ui/build/
-
-
