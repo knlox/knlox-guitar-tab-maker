@@ -11,6 +11,7 @@ function App() {
   const [theme, setTheme] = useState('light');
   const [user, setUser] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' });
@@ -202,8 +203,33 @@ function App() {
     deleteUser(user.id).then(() => {
       setUser(null);
       localStorage.removeItem('profile');
-      setSettingsOpen(false);
+      setProfileOpen(false);
     }).catch(err => console.error(err));
+  };
+
+  // profile editing state
+  const [profileForm, setProfileForm] = useState({ email: '', name: '', password: '' });
+
+  const openProfile = () => {
+    if (user) setProfileForm({ email: user.email || '', name: user.name || '', password: '' });
+    setProfileOpen(true);
+  };
+
+  const saveProfile = () => {
+    if (!user) return alert('No user signed in');
+    const payload = { ...user, email: profileForm.email, name: profileForm.name };
+    // only set password if provided
+    if (profileForm.password) payload.password = profileForm.password;
+    createOrUpdateUser(payload)
+      .then(res => {
+        setUser(res.data);
+        localStorage.setItem('profile', JSON.stringify(res.data));
+        setProfileOpen(false);
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Failed to save profile: ' + (err.response?.data || err.message));
+      });
   };
 
   const openNew = () => {
@@ -292,31 +318,36 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <div className="brand">
-          <img src={logo} className="App-logo" alt="logo" />
-          <div>
-            <h1>Guitar Tab Maker</h1>
-            <p className="subtitle">Browse and preview guitar tabs</p>
+      <header className="App-header" style={{display:'flex', alignItems:'center', gap:16, padding:'12px 20px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:12}}>
+          <div className="brand" style={{display:'flex', alignItems:'center', gap:12}}>
+            <img src={logo} className="App-logo" alt="logo" />
+            <div>
+              <h1 style={{margin:0, fontSize:18}}>Guitar Tab Maker</h1>
+              <p className="subtitle">Browse and preview guitar tabs</p>
+            </div>
+          </div>
+          {user ? <div className="tab-meta" style={{fontWeight:700, color:'var(--text)'}}>{`Welcome, ${user.name || 'User'}!`}</div> : null}
+        </div>
+
+        <div style={{flex:1, display:'flex', justifyContent:'center'}}>
+          <div className="controls" style={{display:'flex', gap:12, alignItems:'center', width:'100%', maxWidth:700}}>
+            <input
+              className="search"
+              placeholder="Search by title or artist..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              style={{flex:1}}
+            />
+            <button className="btn primary" onClick={openNew}>New Tab</button>
+            {user ? null : (
+              <button className="btn" onClick={mockSignInWithGoogle}>Sign in with Google</button>
+            )}
           </div>
         </div>
-        <div className="controls">
-          <input
-            className="search"
-            placeholder="Search by title or artist..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
-          <button className="btn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? '🌙' : '☀️'}</button>
-          <button className="btn primary" onClick={openNew}>New Tab</button>
-          {user ? (
-            <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
-              <div className="tab-meta">{user.name}</div>
-              <button className="btn" onClick={openSettings}>Settings</button>
-            </div>
-          ) : (
-            <button className="btn" onClick={mockSignInWithGoogle}>Sign in with Google</button>
-          )}
+
+        <div style={{display:'flex', alignItems:'center', marginLeft: 'auto'}}>
+          <button className="btn" onClick={openSettings} title="Settings" style={{fontSize:18, padding:'6px 10px'}} aria-label="Settings">⚙️</button>
         </div>
       </header>
 
@@ -399,13 +430,37 @@ function App() {
           <div className="modal">
             <h3>Settings</h3>
             <label>Theme</label>
-            <select value={theme} onChange={e => setTheme(e.target.value)}>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+            <div style={{display:'flex', gap:8, alignItems:'center'}}>
+              <button
+                className="btn"
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                style={{padding: '6px 12px', borderRadius: 9999, background: theme === 'dark' ? 'linear-gradient(90deg,#334155,#0f172a)' : 'linear-gradient(90deg,#f8fafc,#e2e8f0)', color: 'var(--text)'}}
+              >
+                {theme === 'light' ? 'Light' : 'Dark'}
+              </button>
+            </div>
             <div style={{display:'flex', gap:8, marginTop:12}}>
               <button className="btn primary" onClick={saveSettings}>Save</button>
-              <button className="btn" onClick={() => setSettingsOpen(false)}>Cancel</button>
+              <button className="btn" onClick={() => setSettingsOpen(false)}>Close</button>
+              <button className="btn" onClick={() => { setSettingsOpen(false); openProfile(); }}>Edit Profile</button>
+              <button className="btn" onClick={handleDeleteAccount} style={{marginLeft:'auto', color:'#cc3333'}}>Delete Account</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {profileOpen && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>Profile</h3>
+            <label>Email</label>
+            <input value={profileForm.email} onChange={e => setProfileForm({...profileForm, email: e.target.value})} />
+            <label>Name</label>
+            <input value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} />
+            <label>New password (leave blank to keep existing)</label>
+            <input type="password" value={profileForm.password} onChange={e => setProfileForm({...profileForm, password: e.target.value})} />
+            <div style={{display:'flex', gap:8, marginTop:12}}>
+              <button className="btn primary" onClick={saveProfile}>Save</button>
+              <button className="btn" onClick={() => setProfileOpen(false)}>Cancel</button>
               <button className="btn" onClick={handleDeleteAccount} style={{marginLeft:'auto', color:'#cc3333'}}>Delete Account</button>
             </div>
           </div>
