@@ -20,12 +20,21 @@ function App() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTab, setEditTab] = useState(null);
   const TUNING_PRESETS = {
-    'Standard (E A D G B e)': ['e','B','G','D','A','E'].reverse(),
-    'Drop D (D A D G B e)': ['e','B','G','D','A','D'].reverse(),
-    'Open G (D G D G B D)': ['D','B','G','D','G','D'].reverse(),
-    'DADGAD (D A D G A D)': ['D','A','G','D','A','D'].reverse(),
-    'Half Step Down (D# A# D# G# C# F#)': ['F#','C#','G#','D#','A#','D#'].reverse(),
-    'Open D (D A D F# A D)': ['D','A','F#','D','A','D'].reverse(),
+    // Standard
+    'Standard (E A D G B e)': ['e','B','G','D','A','E'],
+
+    // Drop Tunings
+    'Drop D (D A D G B e)': ['e','B','G','D','A','D'],
+    'Drop C (C G C F A D)': ['d','A','F','C','G','C'],
+    'Drop B (B F# B E G# C#)': ['C#','G#','E','B','F#','B'],
+
+    // Open Tunings
+    'Open G (D G D G B D)': ['d','B','G','D','G','D'],
+    'Open D (D A D F# A D)': ['d','A','F#','D','A','D'],
+
+    // Alternate / Half-step
+    'Half Step Down (Eb Ab Db Gb Bb Eb)': ['Eb','Bb','Gb','Db','Ab','Eb'],
+    'DADGAD (D A D G A D)': ['d','A','G','D','A','D'],
   };
 
   // produce scaffold in blocks: each block contains one line per string
@@ -37,9 +46,15 @@ function App() {
   // A|--------------------------------------------------|
   // E|--------------------------------------------------|
   // repeat blockCount times separated by a blank line
-  const makeScaffold = (strings, blockCount = 8, dashCount = 50) => {
-    const dashLine = '-'.repeat(dashCount);
-    const block = strings.map(s => `${s}|${dashLine}|`).join('\n');
+  // strings: array top-to-bottom, blockCount: how many blocks, dashCount: dashes per measure, measuresPerBlock: number of measure columns per block
+  const makeScaffold = (strings, blockCount = 8, dashCount = 50, measuresPerBlock = 1) => {
+    const measure = '-'.repeat(dashCount);
+    const lineForString = (s) => {
+      const cols = Array(measuresPerBlock).fill(measure).map(m => m).join('|');
+      // example: e|-----|-----|
+      return `${s}|${cols}|`;
+    };
+    const block = strings.map(s => lineForString(s)).join('\n');
     return Array(blockCount).fill(block).join('\n\n') + '\n';
   };
 
@@ -475,8 +490,9 @@ function App() {
                 setTuningPreset(p);
                 const strings = TUNING_PRESETS[p];
                 // only regenerate scaffold for new tabs (don't overwrite existing content while editing)
-                if (!editTab) {
-                  setForm({...form, tuning: p, tabContent: makeScaffold(strings, blockCount, 50)});
+                            if (!editTab) {
+                              // use 2 measures per block in the default scaffold preview to match sample layout
+                              setForm({...form, tuning: p, tabContent: makeScaffold(strings, blockCount, 50, 2)});
                 } else {
                   setForm({...form, tuning: p});
                 }
@@ -485,6 +501,10 @@ function App() {
               </select>
               <label>Blocks</label>
               <input type="number" min={1} max={64} value={blockCount} onChange={e => setBlockCount(Math.max(1, Number(e.target.value || 1)))} />
+              <div style={{marginTop:8}}>
+                <div style={{fontSize:13, color:'var(--muted)', marginBottom:6}}>Tuning preview</div>
+                <pre className="tab-pre" style={{height:120, overflow:'auto'}}>{makeScaffold(TUNING_PRESETS[tuningPreset], 1, 120, 2)}</pre>
+              </div>
               <label>Tab Content</label>
               <textarea value={form.tabContent} onChange={e => setForm({...form, tabContent: e.target.value})} rows={8} />
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -529,7 +549,19 @@ function App() {
                 <div style={{display: 'flex', gap: 8}}>
                   <input placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
                   <input placeholder="Artist" value={form.artist} onChange={e => setForm({...form, artist: e.target.value})} />
-                  <select value={tuningPreset} onChange={e => { const p=e.target.value; setTuningPreset(p); setForm({...form, tuning: p}); }}>
+                  <select value={tuningPreset} onChange={e => {
+                    const p = e.target.value;
+                    setTuningPreset(p);
+                    setForm({...form, tuning: p});
+                    // if this is a new tab (no fullscreenTab), regenerate the scaffold content to match the tuning
+                    try {
+                      const strings = TUNING_PRESETS[p];
+                      if (!fullscreenTab) {
+                        setFullscreenContent(makeScaffold(strings, blockCount, 50, 2));
+                        setForm(prev => ({...prev, tabContent: makeScaffold(strings, blockCount, 50, 2)}));
+                      }
+                    } catch (err) { /* ignore */ }
+                  }}>
                     {Object.keys(TUNING_PRESETS).map(k => <option key={k} value={k}>{k}</option>)}
                   </select>
                 </div>
