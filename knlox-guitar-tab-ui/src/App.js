@@ -64,6 +64,7 @@ function App() {
 
   const [form, setForm] = useState({ title: '', artist: '', tuning: '', tabContent: '' });
   const [tuningPreset, setTuningPreset] = useState('Standard (E A D G B e)');
+  const [blockCount, setBlockCount] = useState(8);
 
   useEffect(() => {
     setLoading(true);
@@ -238,7 +239,7 @@ function App() {
   const openNew = () => {
     setEditTab(null);
   const strings = TUNING_PRESETS[tuningPreset];
-  const scaffold = makeScaffold(strings, 8, 50);
+  const scaffold = makeScaffold(strings, blockCount, 50);
   setForm({ title: '', artist: '', tuning: tuningPreset, tabContent: scaffold });
   setFullscreenContent(scaffold);
   setFullscreenTab(null); // indicate new tab
@@ -274,7 +275,7 @@ function App() {
   };
 
   const handleSave = () => {
-    const processedContent = ensureMinMeasures(form.tabContent, 64);
+  const processedContent = ensureMinMeasures(form.tabContent, blockCount);
     const payload = { ...form, tabContent: processedContent };
     const action = editTab ? updateTab(editTab.id, payload) : createTab(payload);
     action
@@ -287,13 +288,18 @@ function App() {
 
   const openFullscreen = (tab) => {
     setFullscreenTab(tab);
-    setFullscreenContent(tab.tabContent || ensureMinMeasures('', 64));
+    // set blockCount from the tab if present
+    try {
+      const blocks = (tab.tabContent || '').split(/\n\s*\n/).filter(b => b.trim() !== '');
+      if (blocks.length) setBlockCount(blocks.length);
+    } catch (e) {}
+    setFullscreenContent(tab.tabContent || ensureMinMeasures('', blockCount));
   setFullscreenEditing(false);
   setFullscreenOpen(true);
   };
 
   const handleFullscreenSave = () => {
-    const processed = ensureMinMeasures(fullscreenContent, 64);
+  const processed = ensureMinMeasures(fullscreenContent, blockCount);
     setSaving(true);
     if (!fullscreenTab) {
       // create new
@@ -470,13 +476,15 @@ function App() {
                 const strings = TUNING_PRESETS[p];
                 // only regenerate scaffold for new tabs (don't overwrite existing content while editing)
                 if (!editTab) {
-                  setForm({...form, tuning: p, tabContent: makeScaffold(strings, 8, 50)});
+                  setForm({...form, tuning: p, tabContent: makeScaffold(strings, blockCount, 50)});
                 } else {
                   setForm({...form, tuning: p});
                 }
               }}>
                 {Object.keys(TUNING_PRESETS).map(k => <option key={k} value={k}>{k}</option>)}
               </select>
+              <label>Blocks</label>
+              <input type="number" min={1} max={64} value={blockCount} onChange={e => setBlockCount(Math.max(1, Number(e.target.value || 1)))} />
               <label>Tab Content</label>
               <textarea value={form.tabContent} onChange={e => setForm({...form, tabContent: e.target.value})} rows={8} />
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
