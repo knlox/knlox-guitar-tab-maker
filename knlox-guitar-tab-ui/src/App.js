@@ -58,6 +58,9 @@ function App() {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenContent, setFullscreenContent] = useState('');
   const [fullscreenTab, setFullscreenTab] = useState(null);
+  const [fullscreenEditing, setFullscreenEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
 
   const [form, setForm] = useState({ title: '', artist: '', tuning: '', tabContent: '' });
   const [tuningPreset, setTuningPreset] = useState('Standard (E A D G B e)');
@@ -239,6 +242,7 @@ function App() {
   setForm({ title: '', artist: '', tuning: tuningPreset, tabContent: scaffold });
   setFullscreenContent(scaffold);
   setFullscreenTab(null); // indicate new tab
+  setFullscreenEditing(true);
   setFullscreenOpen(true);
   };
 
@@ -284,11 +288,13 @@ function App() {
   const openFullscreen = (tab) => {
     setFullscreenTab(tab);
     setFullscreenContent(tab.tabContent || ensureMinMeasures('', 64));
-    setFullscreenOpen(true);
+  setFullscreenEditing(false);
+  setFullscreenOpen(true);
   };
 
   const handleFullscreenSave = () => {
     const processed = ensureMinMeasures(fullscreenContent, 64);
+    setSaving(true);
     if (!fullscreenTab) {
       // create new
       const payload = { title: form.title || 'Untitled', artist: form.artist || '', tuning: form.tuning || tuningPreset, tabContent: processed };
@@ -297,8 +303,11 @@ function App() {
           setFullscreenOpen(false);
           setFullscreenContent('');
           refetch();
+          // show saved toast
+          setToastVisible(true); setTimeout(() => setToastVisible(false), 1800);
         })
-        .catch(err => console.error(err));
+        .catch(err => console.error(err))
+        .finally(() => setSaving(false));
     } else {
       const payload = { ...fullscreenTab, tabContent: processed };
       updateTab(fullscreenTab.id, payload)
@@ -307,10 +316,82 @@ function App() {
           setFullscreenTab(null);
           setFullscreenContent('');
           refetch();
+          setToastVisible(true); setTimeout(() => setToastVisible(false), 1800);
         })
-        .catch(err => console.error(err));
+        .catch(err => console.error(err))
+        .finally(() => setSaving(false));
     }
   };
+
+  // export current fullscreen view to PDF via print dialog
+  const exportPdf = () => {
+    const title = form.title || (fullscreenTab && fullscreenTab.title) || 'Tab';
+    const artist = form.artist || (fullscreenTab && fullscreenTab.artist) || '';
+    const content = fullscreenContent || form.tabContent || (fullscreenTab && fullscreenTab.tabContent) || '';
+    const currentTheme = theme || 'light';
+    const bg = currentTheme === 'dark' ? '#021124' : '#ffffff';
+    const color = currentTheme === 'dark' ? '#dbeafe' : '#0f172a';
+
+    const html = `
+      <html>
+        <head>
+          <title>${title}</title>
+          <meta charset="utf-8" />
+          <style>
+            body{font-family: Arial, Helvetica, sans-serif; margin:24px; background:${bg}; color:${color};}
+            .hdr{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px}
+            .title{font-size:20px; font-weight:700}
+            .artist{font-size:14px; color: ${currentTheme === 'dark' ? '#93c5fd' : '#475569'}}
+            pre{white-space:pre-wrap; font-family: ui-monospace, monospace; background: transparent; padding:12px; border-radius:8px}
+            .card{background: ${currentTheme === 'dark' ? '#071428' : '#f8fafc'}; padding:16px; border-radius:12px}
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="hdr"><div><div class="title">${title}</div><div class="artist">${artist}</div></div><div>${new Date().toLocaleString()}</div></div>
+            <pre>${content.replace(/</g,'&lt;')}</pre>
+          </div>
+        </body>
+      </html>
+    `;
+    const win = window.open('', '_blank');
+    if (!win) { alert('Unable to open print window - please allow popups.'); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { try { win.focus(); win.print(); } catch (e) { console.error(e); } }, 500);
+  };
+
+    // export as plain text file
+    const exportText = () => {
+      const title = (form.title || (fullscreenTab && fullscreenTab.title) || 'tab').replace(/[^a-z0-9\-]/gi, '_');
+      const content = fullscreenContent || form.tabContent || (fullscreenTab && fullscreenTab.tabContent) || '';
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    };
+
+    const copyToClipboard = async () => {
+      const content = fullscreenContent || form.tabContent || (fullscreenTab && fullscreenTab.tabContent) || '';
+      try {
+        await navigator.clipboard.writeText(content);
+        setToastVisible(true); setTimeout(() => setToastVisible(false), 1400);
+      } catch (e) {
+        // fallback
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        setToastVisible(true); setTimeout(() => setToastVisible(false), 1400);
+      }
+    };
 
   const filtered = tabs.filter(t =>
     `${t.title} ${t.artist}`.toLowerCase().includes(query.toLowerCase()),
@@ -366,7 +447,6 @@ function App() {
                   </div>
                   <pre className="tab-pre" onClick={() => openFullscreen(tab)} style={{cursor: 'pointer'}}>{tab.tabContent}</pre>
                   <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <button className="btn" onClick={() => openEdit(tab.id)}>Edit</button>
                     <button className="btn" onClick={() => handleDelete(tab.id)}>Delete</button>
                   </div>
                 </article>
@@ -407,24 +487,62 @@ function App() {
           </div>
         )}
       {fullscreenOpen && (
-        <div className="modal-backdrop">
-          <div className="modal" style={{width: '95%', maxWidth: 'none', height: '90%', overflow: 'hidden'}}>
-            <h3>{fullscreenTab ? `Editing: ${fullscreenTab.title || 'Tab'}` : 'New Tab (Full screen editor)'}</h3>
-            <div style={{display: 'flex', gap: 8}}>
-              <input placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
-              <input placeholder="Artist" value={form.artist} onChange={e => setForm({...form, artist: e.target.value})} />
-              <select value={tuningPreset} onChange={e => { const p=e.target.value; setTuningPreset(p); setForm({...form, tuning: p}); }}>
-                {Object.keys(TUNING_PRESETS).map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
+        <div className="modal-backdrop fullscreen">
+          <div className="modal modal-fullscreen">
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h3 style={{margin:0}}>{fullscreenTab ? (fullscreenTab.title || 'Tab') : 'New Tab'}</h3>
+              <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                <button className="btn" onClick={() => exportPdf()}>Export PDF</button>
+                <button className="btn" onClick={() => exportText()}>Export TXT</button>
+                <button className="btn" onClick={() => copyToClipboard()}>Copy</button>
+                {!fullscreenEditing ? (
+                  <>
+                    <button className="btn" onClick={() => {
+                      // enter edit mode, initialize form and content
+                      setFullscreenEditing(true);
+                      setForm({ title: fullscreenTab?.title || form.title || '', artist: fullscreenTab?.artist || form.artist || '', tuning: fullscreenTab?.tuning || tuningPreset, tabContent: fullscreenTab?.tabContent || fullscreenContent || '' });
+                      setTuningPreset(fullscreenTab?.tuning || tuningPreset);
+                      setFullscreenContent(fullscreenTab?.tabContent || fullscreenContent || '');
+                    }}>Edit</button>
+                    <button className="btn" onClick={() => setFullscreenOpen(false)}>Close</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn" onClick={() => { setFullscreenEditing(false); /* discard edits visually by resetting fullscreenContent */ setFullscreenContent(fullscreenTab?.tabContent || ''); }}>Cancel</button>
+                  </>
+                )}
+              </div>
             </div>
-            <textarea style={{flex: 1, height: 'calc(100% - 160px)', fontFamily: 'ui-monospace, monospace', marginTop: 8}} value={fullscreenContent} onChange={e => setFullscreenContent(e.target.value)} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button className="btn primary" onClick={handleFullscreenSave}>Save</button>
-              <button className="btn" onClick={() => setFullscreenOpen(false)}>Close</button>
-            </div>
+
+            {!fullscreenEditing ? (
+              <pre className="tab-pre" style={{whiteSpace:'pre-wrap', overflow:'auto', height: 'calc(100% - 56px)', marginTop:12}}>{fullscreenContent}</pre>
+            ) : (
+              <div style={{display:'flex', flexDirection:'column', height: '100%'}}>
+                <div style={{display: 'flex', gap: 8}}>
+                  <input placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} />
+                  <input placeholder="Artist" value={form.artist} onChange={e => setForm({...form, artist: e.target.value})} />
+                  <select value={tuningPreset} onChange={e => { const p=e.target.value; setTuningPreset(p); setForm({...form, tuning: p}); }}>
+                    {Object.keys(TUNING_PRESETS).map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <textarea style={{flex: 1, marginTop:8, fontFamily: 'ui-monospace, monospace'}} value={fullscreenContent} onChange={e => setFullscreenContent(e.target.value)} />
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button className="btn primary" onClick={() => {
+                    setForm({...form, tabContent: fullscreenContent});
+                    handleFullscreenSave();
+                  }} disabled={saving}>
+                    {saving ? <span className="spinner" style={{marginRight:8}}></span> : null}
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button className="btn" onClick={() => { setFullscreenEditing(false); setFullscreenContent(fullscreenTab?.tabContent || ''); }} disabled={saving}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
+      {/* toast */}
+      <div className={`toast ${toastVisible ? 'show' : ''}`}>Saved</div>
       {settingsOpen && (
         <div className="modal-backdrop">
           <div className="modal">
