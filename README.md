@@ -12,7 +12,8 @@ KNLOX Guitar Tab Maker is a web application for creating, managing, and sharing 
 
 ## Tech Stack
 
-- **Backend:** Java, Spring Boot, Spring Data JPA  
+- **Backend:** Java, Spring Boot, Spring Data JPA
+- **Frontend:** React, Node.js, Axios  
 - **Database:** PostgreSQL  
 - **API Testing:** Postman  
 - **Build Tool:** Maven  
